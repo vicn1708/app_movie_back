@@ -1,11 +1,20 @@
 import mongoose from "mongoose";
-import { MovieModel } from "./movies.schema";
 import { dateSchema } from "./date-root.schema";
+import { Status } from "../constants/enum";
+
+export interface ICategory extends mongoose.Document {
+  name: string;
+  status: string;
+}
 
 const CategorySchema = new mongoose.Schema({
-  name: String,
+  name: { type: String, unique: true, required: true },
+
+  status: { type: String, default: Status.ACTIVE },
 
   ...dateSchema,
 });
 
-export const CategoryModel = mongoose.model("categories", CategorySchema);
+const CategoryModel = mongoose.model<ICategory>("categories", CategorySchema);
+
+export default CategoryModel;

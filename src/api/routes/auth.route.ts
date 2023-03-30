@@ -1,27 +1,32 @@
 import { authController } from "../controllers/auth.controller";
 import express from "express";
 import passport from "passport";
-import { validateRequest, validatorDto } from "../middleware/validator";
 import { Role } from "../middleware/roles";
+import { validateRequest } from "../middleware/validator";
+import { validatorDto } from "../middleware/validator/validator.dto";
 
-export default (router: express.Router) => {
+const router = express.Router();
+
+export default (): express.Router => {
   router.post(
-    "/auth/register",
+    "/register",
     validateRequest(validatorDto.createUserDto),
     authController.register
   );
 
   router.post(
-    "/auth/login",
+    "/login",
     validateRequest(validatorDto.loginUserDto),
     authController.login
   );
 
-  // router.get(
-  //   "/auth/profile",
-  //   passport.authenticate("jwt", { session: false }),
-  //   authController.profile
-  // );
+  router.get(
+    "/profile",
+    passport.authenticate("jwt", { session: false }),
+    authController.profile
+  );
+
+  router.post("/refresh-token", authController.refreshToken);
 
   // router.get(
   //   "/auth/findAll",
@@ -29,4 +34,6 @@ export default (router: express.Router) => {
   //   Role.checkAdminRole,
   //   authController.findUsers
   // );
+
+  return router;
 };

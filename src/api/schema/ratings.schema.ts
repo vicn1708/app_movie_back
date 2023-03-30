@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 import { dateSchema } from "./date-root.schema";
 
+export interface IRating extends mongoose.Document {
+  likes: number;
+  views: number;
+  prize: number;
+}
+
 const RatingSchema = new mongoose.Schema({
   likes: { type: Number, default: 0 },
 
@@ -11,4 +17,6 @@ const RatingSchema = new mongoose.Schema({
   ...dateSchema,
 });
 
-export const RatingModel = mongoose.model("ratings", RatingSchema);
+const RatingModel = mongoose.model<IRating>("ratings", RatingSchema);
+
+export default RatingModel;

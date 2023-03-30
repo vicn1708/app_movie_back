@@ -10,12 +10,13 @@ cloudinary.config({
 
 const cloudinaryOption = {
   cloudinary,
-  allowedFormats: ["jpg", "png"],
   filename: function (req: any, file: any, cb: any) {
     cb(null, file.originalname);
   },
   params: {
     folder: "nodejs",
+    allowed_formats: ["jpg", "png", "mp4"],
+    resource_type: "auto",
   },
 };
 

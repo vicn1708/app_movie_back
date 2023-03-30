@@ -1,17 +1,26 @@
 import { Status } from "../constants/enum";
 import mongoose, { Types } from "mongoose";
 import { dateSchema } from "./date-root.schema";
-import { RoleModel } from "./roles.schema";
-import { AccountModel } from "./accounts.schema";
+import RoleModel from "./roles.schema";
+import AccountModel from "./accounts.schema";
+
+export interface IUser extends mongoose.Document {
+  account: Types.ObjectId;
+  username: string;
+  phone: string;
+  avatar: string;
+  status: string;
+  refresh_token: string;
+}
 
 const UserSchema = new mongoose.Schema({
   account: { type: Types.ObjectId, ref: AccountModel },
 
   username: String,
 
-  phone: String,
+  phone: { type: String, unique: false, default: "" },
 
-  avatar: String,
+  avatar: { type: String, default: "" },
 
   role: { type: Types.ObjectId, ref: RoleModel },
 
@@ -22,4 +31,6 @@ const UserSchema = new mongoose.Schema({
   ...dateSchema,
 });
 
-export const UserModel = mongoose.model("users", UserSchema);
+const UserModel = mongoose.model<IUser>("users", UserSchema);
+
+export default UserModel;

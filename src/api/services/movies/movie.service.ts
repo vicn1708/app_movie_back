@@ -1,201 +1,273 @@
-import { Request, Response } from "express";
-import { VideoModel } from "../../schema/videos.schema";
-import { MovieModel } from "../../schema/movies.schema";
-import { RatingModel } from "../../schema/ratings.schema";
-import { CategoryModel } from "../../schema/categories.schema";
-import { BannerModel } from "../../schema/banners.schema";
-import { PosterModel } from "../../schema/posters.schema";
+import VideoModel from "../../schema/videos.schema";
+import MovieModel from "../../schema/movies.schema";
+import RatingModel from "../../schema/ratings.schema";
+import CategoryModel from "../../schema/categories.schema";
+import BannerModel from "../../schema/banners.schema";
+import PosterModel from "../../schema/posters.schema";
 import mongoose, { ObjectId } from "mongoose";
 import { v2 } from "cloudinary";
+import createError from "http-errors";
 const cloudinary = v2.uploader;
 
 export const movieService = {
-  async create(req: Request, res: Response) {
-    const {
-      title,
-      description,
-      trailer,
-      characters,
-      categories,
-      genres,
-      casts,
-    } = JSON.parse(req.body.data);
+  async create(dataMovie: any, filesMovie: any) {
+    try {
+      const { title, description, characters, categories, genres, casts } =
+        JSON.parse(dataMovie);
 
-    if (
-      !title ||
-      !description ||
-      !trailer ||
-      !characters ||
-      !categories ||
-      !genres ||
-      !casts
-    ) {
       if (
-        typeof characters != typeof [] ||
-        typeof categories != typeof [] ||
-        typeof genres != typeof [] ||
-        typeof casts != typeof []
+        !title ||
+        !description ||
+        !characters ||
+        !categories ||
+        !genres ||
+        !casts
       ) {
-        return res.status(400).send("List data not an array");
+        if (
+          typeof characters != typeof [] ||
+          typeof categories != typeof [] ||
+          typeof genres != typeof [] ||
+          typeof casts != typeof []
+        ) {
+          throw createError.BadRequest("List data not an array");
+        }
+        throw createError.BadRequest("Data field is missing");
       }
-      return res.status(400).send("data field is missing");
+
+      const trailerPublicId = filesMovie["trailer"][0].filename;
+      const bannerPublicId = filesMovie["banner"][0].filename;
+      const posterPublicId = filesMovie["poster"][0].filename;
+
+      if (!trailerPublicId || !bannerPublicId || !posterPublicId) {
+        throw createError.BadRequest("Data file is missing");
+      }
+
+      const trailerPath = filesMovie["trailer"][0].path;
+      const bannerPath = filesMovie["banner"][0].path;
+      const posterPath = filesMovie["poster"][0].path;
+
+      const category: mongoose.Types.ObjectId[] = [];
+
+      await categories.forEach(async (name: string) => {
+        return await CategoryModel.findOne({
+          name: name,
+        }).then((data) => category.push(data._id));
+      });
+
+      const rating = await RatingModel.create({});
+
+      const video = await VideoModel.create({
+        trailer: trailerPath,
+        trailer_public_id: trailerPublicId,
+        // root,
+        // backup,
+      });
+
+      const movie = await MovieModel.create({
+        categories: category,
+        rating: rating._id,
+        video: video._id,
+        title,
+        casts,
+        characters,
+        genres,
+        description,
+      }).then((data) => data.toObject());
+
+      const poster = await PosterModel.create({
+        movie: movie._id,
+        public_id: posterPublicId,
+        uri: posterPath,
+      }).then((data) => data.toObject());
+
+      const banner = await BannerModel.create({
+        movie: movie._id,
+        public_id: bannerPublicId,
+        uri: bannerPath,
+      }).then((data) => data.toObject());
+
+      const result = {
+        movie,
+        poster,
+        banner,
+      };
+
+      return { status: 200, data: result };
+    } catch (error) {
+      console.error(error);
+      return error;
     }
-
-    // const trailerPath = req.files["trailer"][0].path;
-    const bannerPublicId = req.files["banner"][0].filename;
-    const posterPublicId = req.files["poster"][0].filename;
-
-    const bannerPath = req.files["banner"][0].path;
-    const posterPath = req.files["poster"][0].path;
-
-    if (!bannerPath || !posterPath) {
-      return res.status(400).send("data file is missing");
-    }
-
-    const category: mongoose.Types.ObjectId[] = [];
-
-    await categories.forEach(async (name: string) => {
-      return await CategoryModel.findOne({
-        name: name,
-      }).then((data) => category.push(data._id));
-    });
-
-    console.log(category);
-
-    const rating = await RatingModel.create({});
-
-    const video = await VideoModel.create({
-      trailer,
-      // root,
-      // backup,
-    });
-
-    const movie = await MovieModel.create({
-      categories: category,
-      rating: rating._id,
-      video: video._id,
-      title,
-      casts,
-      characters,
-      genres,
-      description,
-    }).then((data) => data.toObject());
-
-    const poster = await PosterModel.create({
-      movie: movie._id,
-      publicId: posterPublicId,
-      uri: posterPath,
-    }).then((data) => data.toObject());
-
-    const banner = await BannerModel.create({
-      movie: movie._id,
-      publicId: bannerPublicId,
-      uri: bannerPath,
-    }).then((data) => data.toObject());
-
-    const result = {
-      movie,
-      poster,
-      banner,
-    };
-
-    return res.status(200).send(result);
   },
 
-  async findAll(req: Request, res: Response) {
-    const banners = await BannerModel.find().select("movie uri");
+  async findAll() {
+    try {
+      const banners = await BannerModel.find().select("movie uri");
 
-    const posters = await PosterModel.find().select("movie uri");
+      const posters = await PosterModel.find().select("movie uri");
 
-    const movies = await MovieModel.find()
-      .populate("categories", "name")
-      .populate("rating")
-      .populate("video", "trailer")
-      .then((data) => {
-        return data.map((movie) => {
-          const banner = banners.filter((banner) => banner.movie == movie.id);
-          const poster = posters.filter((poster) => poster.movie == movie.id);
+      const movies = await MovieModel.find()
+        .populate("categories", "name")
+        .populate("rating")
+        .populate("video", "trailer")
+        .then((data) => {
+          return data.map((movie) => {
+            const banner = banners.filter((banner) => banner.movie == movie.id);
+            const poster = posters.filter((poster) => poster.movie == movie.id);
 
-          return {
-            ...movie.toObject(),
-            banner: banner,
-            poster: poster,
-          };
+            return {
+              ...movie.toObject(),
+              banner: banner,
+              poster: poster,
+            };
+          });
+        });
+
+      return { status: 200, data: movies };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  },
+
+  async findOne(id: string) {
+    try {
+      const movieId: ObjectId = Object(id);
+
+      const movie = await MovieModel.findOne({ _id: movieId })
+        .populate("categories", "name")
+        .populate("rating", "likes views prize")
+        .populate("video", "trailer");
+
+      const banner = await BannerModel.findOne({ movie: movie._id })
+        .select("movie uri")
+        .then((item) => item.toObject());
+
+      const poster = await PosterModel.findOne({ movie: movie._id })
+        .select("movie uri")
+        .then((item) => item.toObject());
+
+      const result = {
+        ...movie.toObject(),
+        banner,
+        poster,
+      };
+
+      return { status: 200, data: result };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  },
+
+  async deleteOne(id: string) {
+    try {
+      const movieId: ObjectId = Object(id);
+
+      const movie = await MovieModel.findOne({ _id: movieId }).select(
+        "rating video"
+      );
+
+      await VideoModel.findById(movie.video).then(async (data) => {
+        return await cloudinary.destroy(
+          data.trailer_public_id,
+          { resource_type: "video" },
+          (err, result) => {
+            if (err) {
+              throw createError.BadRequest("Error destroy video");
+            }
+          }
+        );
+      });
+
+      await BannerModel.findOne({ movie: movieId }).then(async (data) => {
+        return await cloudinary.destroy(data.public_id, (err, result) => {
+          if (err) {
+            throw createError.BadRequest("Error destroy banner");
+          }
         });
       });
 
-    return res.status(200).send(movies);
+      await PosterModel.findOne({ movie: movieId }).then(async (data) => {
+        return await cloudinary.destroy(data.public_id, (err, result) => {
+          if (err) {
+            throw createError.BadRequest("Error destroy poster");
+          }
+        });
+      });
+
+      await RatingModel.findByIdAndDelete(movie.rating).catch((err) => {
+        throw createError.BadRequest("Rating cannot be deleted");
+      });
+
+      await MovieModel.findByIdAndDelete(movieId).catch((err) => {
+        throw createError.BadRequest("Movie cannot be deleted");
+      });
+
+      await BannerModel.deleteOne({ movie: movieId }).catch((err) => {
+        throw createError.BadRequest("Banner cannot be deleted");
+      });
+
+      await PosterModel.deleteOne({ movie: movieId }).catch((err) => {
+        throw createError.BadRequest("Poster cannot be deleted");
+      });
+
+      await VideoModel.findByIdAndDelete(movie.video).catch((err) => {
+        throw createError.BadRequest("Video cannot be deleted");
+      });
+
+      return { status: 200, data: "Delete data successfully" };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
   },
 
-  async findOne(req: Request, res: Response) {
-    const movieId: ObjectId = Object(req.params.id.toString());
+  async getAllMovieByCategory() {
+    try {
+      const banners = await BannerModel.find().select("movie uri");
 
-    const movie = await MovieModel.findOne({ _id: movieId })
-      .populate("categories", "name")
-      .populate("rating")
-      .populate("video", "trailer");
+      const posters = await PosterModel.find().select("movie uri");
 
-    const banner = await BannerModel.findOne({ movie: movie._id })
-      .select("movie uri")
-      .then((item) => item.toObject());
+      const categories = await CategoryModel.find().sort({ index: "asc" });
 
-    const poster = await PosterModel.findOne({ movie: movie._id })
-      .select("movie uri")
-      .then((item) => item.toObject());
+      const result = categories.map(async (category) => {
+        const movies = await MovieModel.find({ categories: category._id })
+          .select("-categories")
+          .populate("rating")
+          .populate("video", "trailer")
+          .then((data) => {
+            return data.map((movie) => {
+              const banner = banners.filter(
+                (banner) => banner.movie == movie.id
+              );
+              const poster = posters.filter(
+                (poster) => poster.movie == movie.id
+              );
 
-    const result = {
-      ...movie.toObject(),
-      banner,
-      poster,
-    };
+              return {
+                ...movie.toObject(),
+                banner: banner,
+                poster: poster,
+              };
+            });
+          });
 
-    res.status(200).send(result);
-  },
-
-  async deleteOne(req: Request, res: Response) {
-    const movieId: ObjectId = Object(req.params.id.toString());
-
-    const movie = await MovieModel.findOne({ _id: movieId }).select(
-      "rating video"
-    );
-
-    await BannerModel.findOne({ movie: movieId }).then((data) => {
-      cloudinary.destroy(data.publicId, (err, result) => {
-        if (err) {
-          console.log("Error:", err);
-          return res.status(400).send({ Error: err });
-        }
+        return {
+          category: category.name,
+          movies,
+        };
       });
-    });
 
-    await PosterModel.findOne({ movie: movieId }).then((data) => {
-      cloudinary.destroy(data.publicId, (err, result) => {
-        if (err) {
-          return res.status(400).send({ Error: err });
-        }
-      });
-    });
+      const resultPending = await Promise.all(result)
+        .then((results) => results)
+        .catch((error) => {
+          throw new Error(error);
+        });
 
-    await RatingModel.findByIdAndDelete(movie.rating).catch((err) => {
-      return res.status(400).send(`Rating cannot be deleted: ${err}`);
-    });
-
-    await VideoModel.findByIdAndDelete(movie.rating).catch((err) => {
-      return res.status(400).send(`Video cannot be deleted: ${err}`);
-    });
-
-    await BannerModel.deleteOne({ movie: movieId }).catch((err) => {
-      return res.status(400).send(`Banner cannot be deleted: ${err}`);
-    });
-
-    await PosterModel.deleteOne({ movie: movieId }).catch((err) => {
-      return res.status(400).send(`Poster cannot be deleted: ${err}`);
-    });
-
-    await MovieModel.findByIdAndDelete(movieId).catch((err) => {
-      return res.status(400).send(`Movie cannot be deleted: ${err}`);
-    });
-
-    return res.status(200).send("Delete data successfully");
+      return { status: 200, data: resultPending };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
   },
 };

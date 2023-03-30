@@ -1,13 +1,18 @@
-import express from "express";
+import { Express } from "express";
 import authRoute from "./auth.route";
 import movieRoute from "./movie.route";
 import categoriesRoute from "./categories.route";
+import userRoute from "./user.route";
+import favoriteRoute from "./favorite.route";
 
-const router = express.Router();
+export default (app: Express) => {
+  app.use("/auth", authRoute());
 
-export default (): express.Router => {
-  authRoute(router);
-  movieRoute(router);
-  categoriesRoute(router);
-  return router;
+  app.use("/user", userRoute());
+
+  app.use("/movies", movieRoute());
+
+  app.use("/categories", categoriesRoute());
+
+  app.use("/favorite", favoriteRoute());
 };

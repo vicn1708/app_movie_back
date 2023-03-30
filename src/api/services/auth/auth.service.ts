@@ -1,21 +1,20 @@
-import express, { Response } from "express";
-import { AccountModel } from "../../schema/accounts.schema";
-import { UserModel } from "../../schema/users.schema";
-import { RoleModel } from "../../schema/roles.schema";
+import AccountModel from "../../schema/accounts.schema";
+import UserModel from "../../schema/users.schema";
+import RoleModel from "../../schema/roles.schema";
 import { hash, compare } from "../../helpers/bcrypt";
 import { Status, TypeUser } from "../../constants/enum";
 import Jwt from "jsonwebtoken";
+import { CreateAccount } from "./types/create-auth.type";
+import { LoginAuth } from "./types/login-auth.type";
+import createError from "http-errors";
 
 export const authService = {
-  async register(
-    req: express.Request,
-    res: express.Response
-  ): Promise<{ access_token: string; refresh_token: string } | Response> {
+  async register(data: CreateAccount) {
     try {
-      const { email, username, password } = req.body;
+      const { email, username, password } = data;
 
       if (!email || !password || !username) {
-        return res.status(400).send("missing data field");
+        throw createError.BadRequest("Missing data field");
       }
 
       const existingUser = await AccountModel.findOne({
@@ -23,7 +22,7 @@ export const authService = {
       });
 
       if (existingUser) {
-        return res.status(400).send("Account already exists");
+        throw createError.Conflict(`${email} is ready been registered`);
       }
 
       const hashPassword = hash(password);
@@ -38,32 +37,28 @@ export const authService = {
         status: Status.ACTIVE,
       });
 
-      const payload = {
+      const user = await UserModel.create({
         account: account._id,
         username: username,
         role: roleId,
         status: Status.ACTIVE,
-      };
+      }).then((data) => data.toObject());
 
       const refresh_token = Jwt.sign(
         {
-          data: payload,
+          data: { _id: user._id, account: user.account },
         },
         process.env.JWT_KEY,
-        { expiresIn: "15d" }
+        { expiresIn: "30d" }
       );
 
-      const user = await UserModel.create({
-        ...payload,
-        refresh_token,
-      }).then((data) => data.toObject());
-
+      await UserModel.findOneAndUpdate({ _id: user._id }, { refresh_token });
       const access_token = Jwt.sign(
         {
-          data: user,
+          data: { _id: user._id, account: user.account },
         },
         process.env.JWT_KEY,
-        { expiresIn: "1h" }
+        { expiresIn: 600 }
       );
 
       const result = {
@@ -71,41 +66,75 @@ export const authService = {
         refresh_token,
       };
 
-      return res.status(200).json(result).end();
+      return { status: 200, data: result };
     } catch (error) {
-      console.log(error);
-      return res.sendStatus(400);
+      console.error(error);
+      return error;
     }
   },
 
-  async login(
-    req: express.Request,
-    res: express.Response
-  ): Promise<{ access_token: string } | Response> {
-    const { email, password } = req.body;
+  async login(data: LoginAuth) {
+    try {
+      const { email, password } = data;
 
-    if (!email || !password) {
-      return res.status(400).send("missing data field");
+      if (!email || !password) {
+        throw createError.BadRequest("Missing data field");
+      }
+
+      const isEmail = await AccountModel.findOne({ email });
+
+      if (!isEmail) {
+        throw createError.BadRequest(`${email} is not exist`);
+      }
+
+      const isMath = compare(password, isEmail.password);
+
+      if (!isMath) {
+        throw createError.BadRequest("Password does not match");
+      }
+
+      const user = await UserModel.findOne({ account: isEmail._id }).then(
+        (data) => data.toObject()
+      );
+
+      const token = Jwt.sign(
+        { data: { _id: user._id, account: user.account } },
+        process.env.JWT_KEY,
+        {
+          expiresIn: 600,
+        }
+      );
+
+      const result = { access_token: token, refresh_token: user.refresh_token };
+
+      return { status: 200, data: result };
+    } catch (error) {
+      console.error(error);
+      return error;
     }
+  },
 
-    const isEmail = await AccountModel.findOne({ email });
+  async getNewAccessToken(refresh_token: string) {
+    try {
+      const user: any = Jwt.verify(refresh_token, process.env.JWT_KEY);
 
-    if (!isEmail) {
-      return res.status(400).send("Email does not exist");
+      if (!user) {
+        throw createError.BadRequest("Not found token or token expired");
+      }
+
+      const token = Jwt.sign({ data: user.data }, process.env.JWT_KEY, {
+        expiresIn: 600,
+      });
+
+      return {
+        status: 200,
+        data: {
+          access_token: token,
+        },
+      };
+    } catch (error) {
+      console.error(error);
+      return error;
     }
-
-    const isMath = compare(password, isEmail.password);
-
-    if (!isMath) {
-      return res.status(400).send("password does not match");
-    }
-
-    const user = await UserModel.findOne({ account: isEmail._id }).then(
-      (data) => data.toObject()
-    );
-
-    const token = Jwt.sign(user, process.env.JWT_KEY, { expiresIn: "1h" });
-
-    return res.json({ access_token: token }).end();
   },
 };
