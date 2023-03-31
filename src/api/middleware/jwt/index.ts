@@ -1,5 +1,5 @@
 import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
-import UserModel from "../../schema/users.schema";
+import AccountModel from "../../schema/accounts.schema";
 
 var opts = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -7,12 +7,14 @@ var opts = {
 };
 
 export const jwtStrategy = new JwtStrategy(opts, async (jwt_payload, done) => {
-  return await UserModel.findOne({ _id: jwt_payload.data._id }).then((user) => {
-    if (user) {
-      return done(null, jwt_payload);
-    }
+  return await AccountModel.findOne({ _id: jwt_payload.data.accountId }).then(
+    (user) => {
+      if (user) {
+        return done(null, jwt_payload);
+      }
 
-    return done(null, false);
-    // or you could create a new account
-  });
+      return done(null, false);
+      // or you could create a new account
+    }
+  );
 });

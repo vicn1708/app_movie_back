@@ -10,7 +10,6 @@ export interface IUser extends mongoose.Document {
   phone: string;
   avatar: string;
   status: string;
-  refresh_token: string;
 }
 
 const UserSchema = new mongoose.Schema({
@@ -25,8 +24,6 @@ const UserSchema = new mongoose.Schema({
   role: { type: Types.ObjectId, ref: RoleModel },
 
   status: { type: String, default: Status.ACTIVE },
-
-  refresh_token: { type: String, default: "" },
 
   ...dateSchema,
 });

@@ -6,6 +6,7 @@ export interface IAccount extends mongoose.Document {
   email: string;
   password: string;
   status: string;
+  refresh_token: string;
 }
 
 const AccountSchema = new mongoose.Schema({
@@ -14,6 +15,8 @@ const AccountSchema = new mongoose.Schema({
   password: { type: String, required: true },
 
   status: { type: String, default: Status.ACTIVE },
+
+  refresh_token: { type: String, default: "" },
 
   ...dateSchema,
 });

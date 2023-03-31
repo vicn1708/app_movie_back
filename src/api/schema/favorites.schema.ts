@@ -5,7 +5,7 @@ import MovieModel from "./movies.schema";
 
 export interface IFavorite extends mongoose.Document {
   user: mongoose.Types.ObjectId;
-  movie: mongoose.Types.ObjectId;
+  movies: Array<mongoose.Types.ObjectId>;
 }
 
 const FavoriteSchema = new mongoose.Schema({

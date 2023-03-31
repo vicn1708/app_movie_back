@@ -46,16 +46,20 @@ export const authService = {
 
       const refresh_token = Jwt.sign(
         {
-          data: { _id: user._id, account: user.account },
+          data: { accountId: account._id },
         },
         process.env.JWT_KEY,
         { expiresIn: "30d" }
       );
 
-      await UserModel.findOneAndUpdate({ _id: user._id }, { refresh_token });
+      await AccountModel.findOneAndUpdate(
+        { _id: account._id },
+        { refresh_token }
+      );
+
       const access_token = Jwt.sign(
         {
-          data: { _id: user._id, account: user.account },
+          data: { accountId: account._id, users: [user._id] },
         },
         process.env.JWT_KEY,
         { expiresIn: 600 }
@@ -93,19 +97,23 @@ export const authService = {
         throw createError.BadRequest("Password does not match");
       }
 
-      const user = await UserModel.findOne({ account: isEmail._id }).then(
-        (data) => data.toObject()
-      );
+      const users = await UserModel.find({
+        account: isEmail._id,
+      });
 
-      const token = Jwt.sign(
-        { data: { _id: user._id, account: user.account } },
-        process.env.JWT_KEY,
-        {
-          expiresIn: 600,
-        }
-      );
+      const dataAccount = {
+        accountId: isEmail._id,
+        users: users.map((user) => user._id),
+      };
 
-      const result = { access_token: token, refresh_token: user.refresh_token };
+      const token = Jwt.sign({ data: dataAccount }, process.env.JWT_KEY, {
+        expiresIn: 600,
+      });
+
+      const result = {
+        access_token: token,
+        refresh_token: isEmail.refresh_token,
+      };
 
       return { status: 200, data: result };
     } catch (error) {
@@ -116,15 +124,26 @@ export const authService = {
 
   async getNewAccessToken(refresh_token: string) {
     try {
-      const user: any = Jwt.verify(refresh_token, process.env.JWT_KEY);
+      const account: any = Jwt.verify(refresh_token, process.env.JWT_KEY);
 
-      if (!user) {
+      if (!account) {
         throw createError.BadRequest("Not found token or token expired");
       }
 
-      const token = Jwt.sign({ data: user.data }, process.env.JWT_KEY, {
-        expiresIn: 600,
-      });
+      const users = await UserModel.find({ account: account.data.accountId });
+
+      const token = Jwt.sign(
+        {
+          data: {
+            ...account.data,
+            users: users.map((user) => user._id),
+          },
+        },
+        process.env.JWT_KEY,
+        {
+          expiresIn: 600,
+        }
+      );
 
       return {
         status: 200,
@@ -132,6 +151,51 @@ export const authService = {
           access_token: token,
         },
       };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  },
+
+  async getAllUserByAccount(account: any) {
+    try {
+      const accountId = account.data.accountId;
+
+      const users = await UserModel.find({ account: accountId }).populate(
+        "role",
+        "name"
+      );
+
+      if (!users) throw createError.BadRequest(`Not found user`);
+
+      return { status: 200, data: users };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  },
+
+  async getMainUserAccount(account: any, userId: string) {
+    try {
+      const main = await UserModel.findOne({ _id: userId })
+        .populate("role", "name")
+        .then((data) => data.toObject());
+
+      if (!main) throw createError.BadRequest(`User is not exist`);
+
+      const userElse = await UserModel.find({
+        account: account.data.accountId,
+        _id: { $ne: userId },
+      }).populate("role", "name");
+
+      if (!userElse) throw createError.BadRequest();
+
+      const result = {
+        ...main,
+        users: userElse,
+      };
+
+      return { status: 200, data: result };
     } catch (error) {
       console.error(error);
       return error;

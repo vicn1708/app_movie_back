@@ -28,6 +28,18 @@ export default (): express.Router => {
 
   router.post("/refresh-token", authController.refreshToken);
 
+  router.get(
+    "/all-users-account",
+    passport.authenticate("jwt", { session: false }),
+    authController.getAllUserByAccount
+  );
+
+  router.get(
+    "/main-users-account/:userId",
+    passport.authenticate("jwt", { session: false }),
+    authController.getMainUserAccount
+  );
+
   // router.get(
   //   "/auth/findAll",
   //   passport.authenticate("jwt", { session: false }),

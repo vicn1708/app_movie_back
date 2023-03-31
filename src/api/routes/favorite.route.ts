@@ -7,5 +7,10 @@ export default (): express.Router => {
 
   router.get("/:userId/:movieId", favoriteController.addMovieToFavorite);
 
+  router.delete(
+    "/:userId/:movieId",
+    favoriteController.removeMovieFromFavorite
+  );
+
   return router;
 };

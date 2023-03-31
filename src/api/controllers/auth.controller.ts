@@ -45,5 +45,33 @@ export const authController = {
     return res.status(access_token.status).send(access_token.data);
   },
 
-  // findUsers: authService.findUsers,
+  async getAllUserByAccount(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response> {
+    const accountId = req.user;
+
+    const users = await authService.getAllUserByAccount(accountId);
+
+    if (!users.data) next(users);
+
+    return res.status(users.status).send(users.data);
+  },
+
+  async getMainUserAccount(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response | void> {
+    const account = req.user;
+
+    const userId = req.params.userId;
+
+    const main = await authService.getMainUserAccount(account, userId);
+
+    if (!main.data) return next(main);
+
+    return res.status(main.status).send(main.data);
+  },
 };

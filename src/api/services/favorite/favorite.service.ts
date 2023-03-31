@@ -1,39 +1,10 @@
 import PosterModel from "../../schema/posters.schema";
 import FavoriteModel from "../../schema/favorites.schema";
 import createError from "http-errors";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import BannerModel from "../../schema/banners.schema";
 
 export const favoriteService = {
-  async addMovieToFavorite(userId: string, movieId: string) {
-    try {
-      const isFavorite = await FavoriteModel.findOne({ user: userId }).then(
-        (data) => data.toObject()
-      );
-
-      if (!isFavorite) {
-        const favorite = await FavoriteModel.create({
-          user: new Types.ObjectId(userId),
-          movies: new Types.ObjectId(movieId),
-        });
-
-        return { status: 200, data: favorite };
-      }
-
-      await FavoriteModel.updateOne(
-        { _id: isFavorite._id },
-        { $push: { movies: new Types.ObjectId(movieId) } }
-      );
-
-      const favorite = await this.findAllByUser(userId);
-
-      return { status: 200, data: favorite };
-    } catch (error) {
-      console.error(error);
-      return error;
-    }
-  },
-
   async findAllByUser(id: string) {
     try {
       const banners = await BannerModel.find().select("movie uri");
@@ -45,7 +16,8 @@ export const favoriteService = {
       })
         .populate("movies")
         .then((data: any) => {
-          return data.movies.map((movie: any) => {
+          const movies = data.movies.reverse();
+          return movies.map((movie: any) => {
             const banner = banners.filter((banner) => banner.movie == movie.id);
             const poster = posters.filter((poster) => poster.movie == movie.id);
 
@@ -58,6 +30,57 @@ export const favoriteService = {
         });
 
       if (!favorite) throw createError.BadRequest(`Not found favorite`);
+
+      return { status: 200, data: favorite };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  },
+
+  async addMovieToFavorite(userId: string, movieId: string) {
+    try {
+      const isFavorite = await FavoriteModel.findOne({ user: userId });
+
+      if (!isFavorite) {
+        const favorite = await FavoriteModel.create({
+          user: userId,
+          movies: movieId,
+        }).then((data) => data.toObject());
+
+        return { status: 200, data: favorite };
+      }
+
+      const isMovie = isFavorite.movies.includes(
+        new mongoose.Types.ObjectId(movieId)
+      );
+
+      if (isMovie) throw createError.BadRequest("Movie had exist");
+
+      const favorite = await FavoriteModel.updateOne(
+        { _id: isFavorite._id },
+        { $push: { movies: movieId } },
+        { new: true }
+      );
+
+      return { status: 200, data: favorite };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  },
+
+  async removeMovieFromFavorite(userId: string, movieId: string) {
+    console.log(userId);
+    console.log(movieId);
+
+    try {
+      const favorite = await FavoriteModel.updateOne(
+        { user: userId },
+        { $pull: { movies: movieId } }
+      );
+
+      if (!favorite) throw createError.BadRequest();
 
       return { status: 200, data: favorite };
     } catch (error) {
