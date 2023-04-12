@@ -5,9 +5,9 @@ const router = express.Router();
 
 export default (): express.Router => {
   router.get(
-    "/all-user-account",
-    passport.authenticate("jwt", { session: false }),
-    userController.getAllUserAccount
+    "/all-users-account",
+    // passport.authenticate("jwt", { session: false }),
+    userController.getAllUserAccount.bind(userController)
   );
   return router;
 };

@@ -5,5 +5,6 @@ export enum Status {
 
 export enum TypeUser {
   ADMIN = "ADMIN",
+  MANAGER = "MANAGER",
   USER = "USER",
 }

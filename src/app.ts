@@ -11,6 +11,7 @@ import passport from "passport";
 import helmet from "helmet";
 import morgan from "morgan";
 import { handleError } from "./api/middleware/handleError";
+import swagger from "./configs/swagger";
 
 const app = express();
 
@@ -31,10 +32,12 @@ passport.use(jwtStrategy);
 
 mongodb.connect();
 
+swagger(app);
+
 router(app);
 
 handleError(app);
 
 app.listen(3000, () => {
-  console.log(`Server running on http://localhost:3000`);
+  console.log(`Server running on http://localhost:3000/api-docs`);
 });

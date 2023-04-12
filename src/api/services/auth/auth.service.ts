@@ -8,7 +8,7 @@ import { CreateAccount } from "./types/create-auth.type";
 import { LoginAuth } from "./types/login-auth.type";
 import createError from "http-errors";
 
-export const authService = {
+export class AuthService {
   async register(data: CreateAccount) {
     try {
       const { email, username, password } = data;
@@ -75,7 +75,7 @@ export const authService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async login(data: LoginAuth) {
     try {
@@ -97,6 +97,16 @@ export const authService = {
         throw createError.BadRequest("Password does not match");
       }
 
+      const refresh_token = Jwt.sign(
+        {
+          data: { accountId: isEmail._id },
+        },
+        process.env.JWT_KEY,
+        { expiresIn: "30d" }
+      );
+
+      await AccountModel.findByIdAndUpdate(isEmail._id, { refresh_token });
+
       const users = await UserModel.find({
         account: isEmail._id,
       });
@@ -112,7 +122,7 @@ export const authService = {
 
       const result = {
         access_token: token,
-        refresh_token: isEmail.refresh_token,
+        refresh_token,
       };
 
       return { status: 200, data: result };
@@ -120,7 +130,7 @@ export const authService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async getNewAccessToken(refresh_token: string) {
     try {
@@ -155,7 +165,7 @@ export const authService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async getAllUserByAccount(account: any) {
     try {
@@ -173,7 +183,7 @@ export const authService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async getMainUserAccount(account: any, userId: string) {
     try {
@@ -200,5 +210,5 @@ export const authService = {
       console.error(error);
       return error;
     }
-  },
-};
+  }
+}

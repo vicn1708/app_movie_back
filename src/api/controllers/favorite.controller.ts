@@ -1,7 +1,13 @@
-import { favoriteService } from "../services/favorite/favorite.service";
+import { FavoriteService } from "../services/favorite/favorite.service";
 import { Request, Response, NextFunction } from "express";
 
-export const favoriteController = {
+class FavoriteController {
+  private readonly favoriteService: FavoriteService;
+
+  constructor(favoriteService: FavoriteService) {
+    this.favoriteService = favoriteService;
+  }
+
   async findFavoriteByUser(
     req: Request,
     res: Response,
@@ -9,12 +15,12 @@ export const favoriteController = {
   ): Promise<Response | void> {
     const userId = req.params.id;
 
-    const favorite = await favoriteService.findAllByUser(userId);
+    const favorite = await this.favoriteService.findAllByUser(userId);
 
     if (!favorite.data) return next(favorite);
 
     return res.status(favorite.status).json(favorite.data);
-  },
+  }
 
   async addMovieToFavorite(
     req: Request,
@@ -23,12 +29,15 @@ export const favoriteController = {
   ): Promise<Response | void> {
     const { userId, movieId } = req.params;
 
-    const favorite = await favoriteService.addMovieToFavorite(userId, movieId);
+    const favorite = await this.favoriteService.addMovieToFavorite(
+      userId,
+      movieId
+    );
 
     if (!favorite.data) return next(favorite);
 
     return res.status(favorite.status).json(favorite.data);
-  },
+  }
 
   async removeMovieFromFavorite(
     req: Request,
@@ -37,7 +46,7 @@ export const favoriteController = {
   ): Promise<Response | void> {
     const { userId, movieId } = req.params;
 
-    const favorite = await favoriteService.removeMovieFromFavorite(
+    const favorite = await this.favoriteService.removeMovieFromFavorite(
       userId,
       movieId
     );
@@ -45,5 +54,7 @@ export const favoriteController = {
     if (!favorite.data) return next(favorite);
 
     return res.status(favorite.status).json(favorite.data);
-  },
-};
+  }
+}
+
+export const favoriteController = new FavoriteController(new FavoriteService());

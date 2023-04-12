@@ -9,8 +9,8 @@ import { v2 } from "cloudinary";
 import createError from "http-errors";
 const cloudinary = v2.uploader;
 
-export const movieService = {
-  async create(dataMovie: any, filesMovie: any) {
+export class MovieService {
+  async create(dataMovie: string, filesMovie: any) {
     try {
       const { title, description, characters, categories, genres, casts } =
         JSON.parse(dataMovie);
@@ -97,7 +97,7 @@ export const movieService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async findAll() {
     try {
@@ -106,6 +106,7 @@ export const movieService = {
       const posters = await PosterModel.find().select("movie uri");
 
       const movies = await MovieModel.find()
+        .sort({ created_at: -1 })
         .populate("categories", "name")
         .populate("rating")
         .populate("video", "trailer")
@@ -127,7 +128,39 @@ export const movieService = {
       console.error(error);
       return error;
     }
-  },
+  }
+
+  async findAllLimit(limit: number) {
+    try {
+      const banners = await BannerModel.find().select("movie uri");
+
+      const posters = await PosterModel.find().select("movie uri");
+
+      const movies = await MovieModel.find()
+        .sort({ created_at: -1 })
+        .populate("categories", "name")
+        .populate("rating")
+        .populate("video", "trailer")
+        .limit(limit)
+        .then((data) => {
+          return data.map((movie) => {
+            const banner = banners.filter((banner) => banner.movie == movie.id);
+            const poster = posters.filter((poster) => poster.movie == movie.id);
+
+            return {
+              ...movie.toObject(),
+              banner: banner,
+              poster: poster,
+            };
+          });
+        });
+
+      return { status: 200, data: movies };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
 
   async findOne(id: string) {
     try {
@@ -157,7 +190,7 @@ export const movieService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async deleteOne(id: string) {
     try {
@@ -220,7 +253,82 @@ export const movieService = {
       console.error(error);
       return error;
     }
-  },
+  }
+
+  async updateOne(dataMovie: string, filesMovie: any, idMovie: string) {
+    try {
+      const movie = await MovieModel.findById(idMovie).populate("video").exec();
+
+      if (!movie) throw createError.BadRequest("Movie is not exits");
+
+      if (dataMovie) {
+        const { title, description, characters, categories, genres, casts } =
+          JSON.parse(dataMovie);
+
+        if (title && title != movie.title) movie.title = title;
+        if (description && description != movie.description)
+          movie.description = description;
+        if (characters && characters != movie.characters)
+          movie.characters = characters;
+        if (categories && categories != movie.categories)
+          movie.categories = categories;
+        if (genres && genres != movie.genres) movie.genres = genres;
+        if (casts && casts != movie.casts) movie.casts = casts;
+      }
+
+      const video = await VideoModel.findById(movie.video).exec();
+      const banner = await BannerModel.findOne({ movie: movie._id });
+      const poster = await PosterModel.findOne({ movie: movie._id });
+
+      if (filesMovie) {
+        const trailerUpdate = filesMovie["trailer"]
+          ? filesMovie["trailer"][0]
+          : undefined;
+        const bannerUpdate = filesMovie["banner"]
+          ? filesMovie["banner"][0]
+          : undefined;
+        const posterUpdate = filesMovie["poster"]
+          ? filesMovie["poster"][0]
+          : undefined;
+
+        if (trailerUpdate) {
+          await cloudinary.destroy(video.trailer_public_id, {
+            resource_type: "video",
+          });
+          video.trailer_public_id = trailerUpdate.filename;
+          video.trailer = trailerUpdate.path;
+        }
+
+        if (bannerUpdate) {
+          await cloudinary.destroy(banner.public_id);
+          banner.public_id = bannerUpdate.filename;
+          banner.uri = bannerUpdate.path;
+        }
+
+        if (posterUpdate) {
+          await cloudinary.destroy(poster.public_id);
+          poster.public_id = posterUpdate.filename;
+          poster.uri = posterUpdate.path;
+        }
+      }
+
+      const movieUpdated = await movie.save();
+      const videoUpdated = await video.save();
+      const bannerUpdated = await banner.save();
+      const posterUpdated = await poster.save();
+
+      const result = {
+        ...movieUpdated,
+        poster: posterUpdated,
+        banner: bannerUpdated,
+      };
+
+      return { status: 200, data: result };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
 
   async getAllMovieByCategory() {
     try {
@@ -269,5 +377,81 @@ export const movieService = {
       console.error(error);
       return error;
     }
-  },
-};
+  }
+
+  async getMoviesTopViews(limit: number) {
+    try {
+      const movies = await MovieModel.aggregate([
+        {
+          $lookup: {
+            from: "categories",
+            localField: "categories",
+            foreignField: "_id",
+            as: "categories",
+          },
+        },
+        {
+          $lookup: {
+            from: "videos",
+            localField: "video",
+            foreignField: "_id",
+            as: "video",
+          },
+        },
+        {
+          $lookup: {
+            from: "ratings",
+            localField: "rating",
+            foreignField: "_id",
+            as: "rating",
+          },
+        },
+        { $sort: { "rating.views": -1 } },
+        { $limit: limit },
+      ]);
+
+      return { status: 200, data: movies };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
+
+  async getMoviesTopLikes(limit: number) {
+    try {
+      const movies = await MovieModel.aggregate([
+        {
+          $lookup: {
+            from: "categories",
+            localField: "categories",
+            foreignField: "_id",
+            as: "categories",
+          },
+        },
+        {
+          $lookup: {
+            from: "videos",
+            localField: "video",
+            foreignField: "_id",
+            as: "video",
+          },
+        },
+        {
+          $lookup: {
+            from: "ratings",
+            localField: "rating",
+            foreignField: "_id",
+            as: "rating",
+          },
+        },
+        { $sort: { "rating.likes": -1 } },
+        { $limit: limit },
+      ]);
+
+      return { status: 200, data: movies };
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
+}

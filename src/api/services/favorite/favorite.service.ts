@@ -4,7 +4,7 @@ import createError from "http-errors";
 import mongoose, { Types } from "mongoose";
 import BannerModel from "../../schema/banners.schema";
 
-export const favoriteService = {
+export class FavoriteService {
   async findAllByUser(id: string) {
     try {
       const banners = await BannerModel.find().select("movie uri");
@@ -36,7 +36,7 @@ export const favoriteService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async addMovieToFavorite(userId: string, movieId: string) {
     try {
@@ -68,7 +68,7 @@ export const favoriteService = {
       console.error(error);
       return error;
     }
-  },
+  }
 
   async removeMovieFromFavorite(userId: string, movieId: string) {
     console.log(userId);
@@ -87,5 +87,5 @@ export const favoriteService = {
       console.error(error);
       return error;
     }
-  },
-};
+  }
+}

@@ -1,4 +1,8 @@
-export type CreateMovie = {
+import { IsObject, IsNotEmpty } from "class-validator";
+
+export class CreateMovie {
+  @IsNotEmpty()
+  @IsObject()
   data: {
     title: string;
     categories: string[];
@@ -7,7 +11,13 @@ export type CreateMovie = {
     genres: string[];
     description: string;
   };
+
+  @IsNotEmpty()
   trailer: File;
+
+  @IsNotEmpty()
   poster: File;
+
+  @IsNotEmpty()
   banner: File;
-};
+}

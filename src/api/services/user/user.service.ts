@@ -1,12 +1,15 @@
-import UserModel from "../../schema/users.schema";
+import { Model } from "mongoose";
+import UserModel, { IUser } from "../../schema/users.schema";
 import createError from "http-errors";
 
-export const userService = {
-  async getAllUserAccount(id: string) {
+export class UserService {
+  async getAllUserAccount() {
     try {
-      const users = await UserModel.find({ account: id })
-        .select("-refresh_token")
-        .populate("role", "name -_id");
+      // const users = await UserModel.find({ account: id })
+      //   .select("-refresh_token")
+      //   .populate("role", "name -_id");
+
+      const users = await UserModel.find();
 
       if (!users) throw createError.BadRequest();
 
@@ -15,5 +18,5 @@ export const userService = {
       console.error(error);
       return error;
     }
-  },
-};
+  }
+}
